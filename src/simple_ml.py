@@ -1,4 +1,5 @@
 import struct
+from struct import unpack
 import numpy as np
 import gzip
 try:
@@ -20,7 +21,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x+y
     ### END YOUR CODE
 
 
@@ -48,7 +49,41 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    with gzip.open(image_filename, 'rb') as f:
+      print("start of parsing X")
+      byte = f.read()
+
+      magicNumberHeader=unpack('>iiii',byte[0:16])
+      assert magicNumberHeader[0]==2051
+      byte=byte[16:]
+      numofPics=magicNumberHeader[1];
+      picSize=magicNumberHeader[2]*magicNumberHeader[3]
+      
+      X=np.zeros((numofPics, picSize), dtype=np.float32)
+      for i in range(numofPics):
+        pic=unpack(str(picSize)+'B', byte[i*picSize:(i+1)*picSize])
+        pic=np.array(pic)
+        X[i]=pic
+      # print(np.linalg.norm(X[:10]))
+      X = X/255
+    
+      # print(X[0])
+      print("end of parsing X")
+
+    with gzip.open(label_filename, 'rb') as f:
+      print("start of parsing y")
+      byte = f.read()
+
+      magicNumberHeader=unpack('>ii',byte[0:8])
+      assert magicNumberHeader[0] == 2049
+      byte=byte[8:]
+      numOfLabels=magicNumberHeader[1];
+      
+      labs=unpack(str(numOfLabels)+'B', byte)
+      y=np.array(labs,dtype=np.uint8) 
+      
+      print("end of parsing y")
+    return X,y
     ### END YOUR CODE
 
 
@@ -68,7 +103,7 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    return np.mean(np.log(np.sum(np.exp(Z), axis=1)) - np.choose(y, Z.T))
     ### END YOUR CODE
 
 
@@ -91,7 +126,16 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    n_iterations = int(X.shape[0] / batch)
+    for i in range(n_iterations):
+      X_batch = X[i * batch:(i + 1) * batch] # (batch * input_dim)
+      y_batch = y[i * batch:(i + 1) * batch] # (batch * input_dim)
+      exp_X_theta = np.exp(np.matmul(X_batch, theta)) # (batch x num_classes)
+      Z = exp_X_theta / np.sum(exp_X_theta, axis=1)[:,None] # (batch x num_classes)
+      I_y = np.zeros_like(Z)
+      np.put_along_axis(I_y, y_batch[:,None], 1, axis=1)  # (batch x num_classes)
+      grad_softmax = np.matmul(X_batch.T, (Z - I_y)) / batch
+      theta -= lr * grad_softmax
     ### END YOUR CODE
 
 
@@ -118,7 +162,69 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    # print(y)
+    W1_0 = W1.copy()
+    n_iterations = int(X.shape[0] / batch)
+    # grad_W1 = np.zeros_like(W1)
+    # grad_W2 = np.zeros_like(W2)
+    # Z1 = np.zeros((batch, W1.shape[1]))
+    for i in range(n_iterations):
+      X_batch = X[i * batch:(i + 1) * batch] # (batch * input_dim)
+      y_batch = y[i * batch:(i + 1) * batch] # (batch * input_dim)
+
+      Z1 = np.matmul(X_batch, W1) # (batch * hidden_dim)
+      checker=np.zeros_like(Z1)
+      ReLU_Z1 = np.greater(Z1, checker).astype(int) # (batch * hidden_dim)
+      Z1 = ReLU_Z1
+      
+      Z1W2 = np.exp(np.matmul(Z1, W2)) # (batch * num_classes)
+      norm_Z1W2 = Z1W2 / np.sum(Z1W2, axis=1)[:,None] # =/=
+      I_y = np.zeros_like(norm_Z1W2)
+      np.put_along_axis(I_y, y_batch[:,None], 1, axis=1)  # (batch x num_classes)
+      G2 = norm_Z1W2 - I_y # (batch x num_classes 
+      
+      G2W2 = np.matmul(G2, W2.T) # (batch x hidden_dim)
+      G1 = ReLU_Z1 * G2W2 # (batch x hidden_dim)  
+      
+      grad_W1 = np.matmul(X_batch.T, G1) / batch # (input_dim x hidden_dim)
+      grad_W2 = np.matmul(Z1.T, G2) / batch # (hidden_dim x num_classes)
+      W1 -= lr * grad_W1
+      W2 -= lr * grad_W2
+      
+      # ----
+      # ---trial--- new W1 used to compute W2
+      # ----
+      # Z1 = np.matmul(X_batch, W1) # (batch * hidden_dim)
+      # checker=np.zeros_like(Z1)
+      # ReLU_Z1 = np.greater(Z1, checker).astype(int) # (batch * hidden_dim)
+
+      # # print(ReLU_Z1)
+      # # Z1 = ReLU_Z1
+      # # Z1 /= n_iterations*batch
+
+      # Z1W2 = np.exp(np.matmul(Z1, W2)) # (batch * num_classes)
+      # norm_Z1W2 = Z1W2 / np.sum(Z1W2, axis=1)[:,None] # =/=
+      # # print(norm_Z1W2)
+      # I_y = np.zeros_like(norm_Z1W2)
+      # np.put_along_axis(I_y, y_batch[:,None], 1, axis=1)  # (batch x num_classes)
+      # # print(I_y)
+      # G2 = norm_Z1W2 - I_y # (batch x num_classes 
+      
+      # G2W2 = np.matmul(G2, W2.T) # (batch x hidden_dim)
+      # G1 = ReLU_Z1 * G2W2 # (batch x hidden_dim)  
+      # # grad_W2 += np.matmul(Z1.T, G2) / batch # (hidden_dim x num_classes)
+
+
+      
+ 
+    # grad_W1 /= n_iterations
+    # grad_W2 /= n_iterations
+
+    # W1 -= lr * grad_W1
+    # W2 -= lr * grad_W2
+
+
+    # print(W1_0 - W1)
     ### END YOUR CODE
 
 
