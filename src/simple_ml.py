@@ -130,10 +130,14 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
     for i in range(n_iterations):
       X_batch = X[i * batch:(i + 1) * batch] # (batch * input_dim)
       y_batch = y[i * batch:(i + 1) * batch] # (batch * input_dim)
-      exp_X_theta = np.exp(np.matmul(X_batch, theta)) # (batch x num_classes)
+      # print("Helllo")
+      exp_X_theta = np.matmul(X_batch, theta)
+      exp_X_theta = np.exp(exp_X_theta) # (batch x num_classes)
+      
       Z = exp_X_theta / np.sum(exp_X_theta, axis=1)[:,None] # (batch x num_classes)
       I_y = np.zeros_like(Z)
       np.put_along_axis(I_y, y_batch[:,None], 1, axis=1)  # (batch x num_classes)
+      
       grad_softmax = np.matmul(X_batch.T, (Z - I_y)) / batch
       theta -= lr * grad_softmax
     ### END YOUR CODE
@@ -175,17 +179,17 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
       Z1 = np.matmul(X_batch, W1) # (batch * hidden_dim)
       checker=np.zeros_like(Z1)
       ReLU_Z1 = np.greater(Z1, checker).astype(int) # (batch * hidden_dim)
-      Z1 = ReLU_Z1
+      Z1 = ReLU_Z1 * Z1
       
       Z1W2 = np.exp(np.matmul(Z1, W2)) # (batch * num_classes)
       norm_Z1W2 = Z1W2 / np.sum(Z1W2, axis=1)[:,None] # =/=
       I_y = np.zeros_like(norm_Z1W2)
       np.put_along_axis(I_y, y_batch[:,None], 1, axis=1)  # (batch x num_classes)
-      G2 = norm_Z1W2 - I_y # (batch x num_classes 
+      G2 = norm_Z1W2 - I_y # (batch x num_classes)
       
       G2W2 = np.matmul(G2, W2.T) # (batch x hidden_dim)
       G1 = ReLU_Z1 * G2W2 # (batch x hidden_dim)  
-      
+
       grad_W1 = np.matmul(X_batch.T, G1) / batch # (input_dim x hidden_dim)
       grad_W2 = np.matmul(Z1.T, G2) / batch # (hidden_dim x num_classes)
       W1 -= lr * grad_W1
